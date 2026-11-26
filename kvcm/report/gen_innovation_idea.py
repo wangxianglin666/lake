@@ -170,7 +170,7 @@ def build(out: Path):
     cx, cw = ix + 1.85, 6.0
     rect(s, cx, top + 0.5, cw, 0.98, RGBColor(0xEE, 0xF6, 0xF7), TEAL, MSO_SHAPE.ROUNDED_RECTANGLE)
     text(s, cx + 0.1, top + 0.52, 3.0, 0.24, [[("KVCM 控制面（旁挂）", 10, TEAL, True)]], margin=0.02)
-    subs = [("① 会话感知保留", "停顿期 pin / 预取，按“未来复用”驱逐"),
+    subs = [("① 会话感知保留", "停顿期 pin / 保活，按“未来复用”驱逐"),
             ("② PD 动态转换", "按配比切换 P/D，KV 经池保活"),
             ("③ 局部性感知路由", "计入数据位置 + 网卡队列 + 命中")]
     sw, gap = 1.88, 0.1
