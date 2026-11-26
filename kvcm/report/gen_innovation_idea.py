@@ -2,10 +2,9 @@
 
 用法：python3 kvcm/report/gen_innovation_idea.py [输出路径]
 依赖：python-pptx。数字均取自 KVCM 仿真结论（kvcm/sim/results），【注入】为人为设定场景。
-配色、字体、idea 名称与同心圆结构沿用 KVCM-汇报-含PD混部-20261124.pptx。
+配色、字体、架构分层与原语名称沿用 KVCM-汇报-含PD混部-20261124.pptx。
 """
 
-import math
 import sys
 from pathlib import Path
 
@@ -162,76 +161,162 @@ def bullets(slide, x, y, w, h, items, accent, size=9.5):
     return text(slide, x, y, w, h, paras, spacing=1.05, space_after=3.5)
 
 
-def ring_diagram(s, px, py, pw, ph):
-    cx, cy = px + pw / 2, py + 2.98
-    r_dram, r_hbm, r_ctl, r_kv = 1.8, 1.35, 0.95, 0.7
+def arrow(slide, x1, y1, x2, y2, color, width=1.25, both=False):
+    c = line(slide, x1, y1, x2, y2, color, width)
+    ln = c.line._get_or_add_ln()
+    ln.append(ln.makeelement(qn("a:tailEnd"), {"type": "triangle", "w": "med", "len": "med"}))
+    if both:
+        ln.append(ln.makeelement(qn("a:headEnd"), {"type": "triangle", "w": "med", "len": "med"}))
+    return c
 
-    label(s, cx - 1.6, py + 0.5, 3.2, 0.34,
-          [[("以 KV 为中心的统一资源调度中枢", 10.5, WHITE, True)]],
-          grad=(RED, RGBColor(0x8E, 0x0B, 0x21), 0), shade=True, radius=0.5)
 
-    circle(s, cx, cy, 2 * r_dram + 0.22, fill=None, line=ROSE, lw=0.75, dash=MSO_LINE.DASH)
-    circle(s, cx, cy, 2 * r_dram, grad=(GREEN_BG, RGBColor(0xCF, 0xEB, 0xD8), 90), line=GREEN,
-           lw=1.25, shade=True)
-    circle(s, cx, cy, 2 * r_hbm, grad=(TEAL_BG, RGBColor(0xC9, 0xE4, 0xE7), 90), line=TEAL, lw=1.25)
-    circle(s, cx, cy, 2 * r_ctl, fill=WHITE, line=RED, lw=1.75, dash=MSO_LINE.DASH)
-    circle(s, cx, cy, 2 * r_kv, grad=(RGBColor(0x1E, 0x3A, 0x6B), NAVY, 90), shade=True)
+def chip(s, x, y, w, h, t, color, fill=WHITE, size=8, bold=False, tc=None):
+    return label(s, x, y, w, h, [[(t, size, tc or color, bold)]], fill, color, radius=0.18, margin=0.02)
 
-    text(s, cx - r_kv, cy - 0.52, 2 * r_kv, 1.04,
-         [[("KV", 22, WHITE, True)], [("集群第一公民", 10, RGBColor(0xFA, 0xCC, 0x15), True)],
-          [("可寻址 · 可保活", 7.5, LINE, False)]],
-         anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, space_after=0, spacing=1.0, margin=0)
-    band = [(r_ctl, r_kv, "KVCM 控制面", "R0–R2", RED, 8),
-            (r_hbm, r_ctl, "HBM · 引擎 LRU", "P / D / P⇄D 实例", TEAL, 8.5),
-            (r_dram, r_hbm, "DRAM 共享池 · KVCM 管理", "跨实例命中 · 保活写回", GREEN, 9)]
-    for ro, ri, top_t, bot_t, color, size in band:
-        hgt = ro - ri
-        w = 2 * math.sqrt(ro ** 2 - (ri + hgt * 0.35) ** 2) * 0.92
-        text(s, cx - w / 2, cy - ro + 0.01, w, hgt - 0.02, [[(top_t, size, color, True)]],
-             anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, margin=0, space_after=0)
-        text(s, cx - w / 2, cy + ri + 0.01, w, hgt - 0.02, [[(bot_t, size - 0.5, color, False)]],
-             anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, margin=0, space_after=0)
 
-    cw, ch = 1.92, 1.15
-    lx, rx = px + 0.15, px + pw - 0.15 - cw
-    ty, by = cy - 1.0 - ch, cy + 1.0
-    cards = [
-        (lx, ty, "1", "会话感知保留", "R1 会话与 KV 环", RED, PINK,
-         "会话 hook 标记停顿，停顿期 pin / 保活；按“未来复用”驱逐，告别 LRU 错杀", 225),
-        (rx, ty, "2", "PD 动态转换", "R2 弹性与容量环", ORANGE, RGBColor(0xFF, 0xF7, 0xED),
-         "按 P/D 配比在线切换实例角色，KV 写回池里保活，切换不丢、不重算", 315),
-        (lx, by, "3", "局部性感知路由", "R0 请求选路环", TEAL, TEAL_BG,
-         "选点联合计入 KV 数据位置 + 网卡出口队列 + 命中，网卡紧张不失稳", 135),
-        (rx, by, "4", "旁挂零 Patch", "池简单 · 策略复杂", GREEN, GREEN_BG,
-         "不改引擎内核，KVCM 故障时回退原生路径；池用哈希条带 + 单副本", 45),
-    ]
-    for x, y, no, title, ring, accent, light, body, ang in cards:
-        a = math.radians(ang)
-        r_b = r_ctl if no != "4" else r_dram
-        bx, by_ = cx + r_b * math.cos(a), cy - r_b * math.sin(a) * -1
-        ex = x + cw if x == lx else x
-        ey = y + ch / 2
-        line(s, bx, by_, ex, ey, accent, 1.0, MSO_LINE.ROUND_DOT)
-        circle(s, ex, ey, 0.09, fill=accent)
-        shape(s, x, y, cw, ch, WHITE, LINE, MSO_SHAPE.ROUNDED_RECTANGLE, shade=True, radius=0.06)
-        shape(s, x, y + 0.08, 0.06, ch - 0.16, fill=accent)
-        text(s, x + 0.12, y + 0.06, cw - 0.18, ch - 0.1,
-             [[(title, 10.5, accent, True)], [(ring, 8, GRAY, True)], [(body, 8.5, INK, False)]],
-             spacing=1.03, space_after=1.5, margin=0.02)
-        badge(s, bx, by_, 0.3, no, accent, 9)
+def layer(s, x, y, w, h, title, color, fill):
+    shape(s, x, y, w, h, grad=(fill, WHITE, 90), line=color, kind=MSO_SHAPE.ROUNDED_RECTANGLE,
+          radius=0.04, shade=True)
+    text(s, x + 0.08, y + 0.02, w - 0.16, 0.24, [[(title, 9, color, True)]],
+         anchor=MSO_ANCHOR.MIDDLE, margin=0.02)
 
-    fy = py + ph - 0.98
-    steps = [("意图下行", RED), ("视图归一", NAVY), ("原语执行", TEAL), ("事实闭环", GREEN)]
-    sw = (pw - 0.3 + 0.12 * 3) / 4
+
+def tag(s, x, y, w, t, color, up=False):
+    y1, y2 = (y + 0.24, y) if up else (y, y + 0.24)
+    arrow(s, x, y1, x, y2, color, 1.5)
+    text(s, x + 0.05, y, 1.4, 0.24, [[(t, 7.5, color, True)]], anchor=MSO_ANCHOR.MIDDLE, margin=0)
+
+
+def arch_diagram(s, px, py, pw, ph):
+    x0, W = px + 0.15, pw - 0.3
+    text(s, px + 1.75, py + 0.1, pw - 1.9, 0.36,
+         [[("三层打通：", 9, NAVY, True), ("意图下行 → 视图归一 → 原语执行 → 事实闭环", 9, RED, True)]],
+         anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.RIGHT, margin=0.02)
+
+    # 上层
+    uy, uh = py + 0.5, 0.64
+    layer(s, x0, uy, W, uh, "上层｜应用 · Agent · 网关（Hook 意图注入）", ORANGE, RGBColor(0xFF, 0xF7, 0xED))
+    ups = ["多轮会话上下文与前缀标识", "Agent 工具等待停顿与下一轮 ETA", "业务优先级 / SLA 与保留预算",
+           "Gateway 准入与流量过载控制"]
+    cw = (W - 0.16 - 3 * 0.08) / 4
+    for i, t in enumerate(ups):
+        chip(s, x0 + 0.08 + i * (cw + 0.08), uy + 0.28, cw, 0.28, t, ORANGE, tc=INK)
+    tag(s, x0 + W / 2, uy + uh, W, "请求 + Hook 意图下行", ORANGE)
+
+    # 中层
+    my, mh = uy + uh + 0.24, 2.02
+    layer(s, x0, my, W, mh, "中层｜KVCM 联合控制中枢（管理面决策 × 控制面执行解耦）", RED, PINK)
+    iy, ih = my + 0.3, mh - 0.38
+    lw_ = 3.0
+    lx = x0 + 0.08
+    shape(s, lx, iy, lw_, ih, WHITE, NAVY, MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.05)
+    text(s, lx + 0.06, iy + 0.02, lw_ - 0.12, 0.22,
+         [[("管理面｜R0–R2 三环", 8.5, NAVY, True), ("  只管全局收益", 7.5, GRAY, False)]],
+         anchor=MSO_ANCHOR.MIDDLE, margin=0.02)
+    rings = [("R0 毫秒选路", "结合 KVT 命中、队列负载与网络成本，逐请求决定去哪个实例", NAVY),
+             ("R1 秒级预热", "响应 Agent Hook 意图与热点变化，驱动会话保活、热点复制与升降层", RED),
+             ("R2 分钟扩缩", "统筹计算池与 KV 池容量，带热缓存扩容、无损排空缩容", TEAL)]
+    ry = iy + 0.27
+    rh = 0.33
+    for t, d, c in rings:
+        label(s, lx + 0.06, ry, 0.82, rh, [[(t, 8, WHITE, True)]], c, radius=0.15, margin=0.01)
+        text(s, lx + 0.92, ry - 0.01, lw_ - 0.97, rh + 0.02, [[(d, 7.5, INK, False)]],
+             anchor=MSO_ANCHOR.MIDDLE, spacing=1.0, space_after=0, margin=0.01)
+        ry += rh + 0.05
+    chip(s, lx + 0.06, ry + 0.01, lw_ - 0.12, 0.25, "KVT 统一视图：块 → 实例 × 介质 × 状态", NAVY,
+         fill=RGBColor(0xEE, 0xF2, 0xF7), size=8, bold=True)
+
+    gx = lx + lw_ + 0.04
+    gw = 0.5
+    arrow(s, gx + 0.02, iy + ih * 0.38, gx + gw - 0.02, iy + ih * 0.38, RED, 1.5)
+    text(s, gx - 0.02, iy + ih * 0.38 - 0.22, gw + 0.04, 0.2, [[("Intent", 7.5, RED, True)]],
+         align=PP_ALIGN.CENTER, margin=0)
+    arrow(s, gx + gw - 0.02, iy + ih * 0.62, gx + 0.02, iy + ih * 0.62, TEAL, 1.5)
+    text(s, gx - 0.02, iy + ih * 0.62 + 0.02, gw + 0.04, 0.2, [[("READY", 7.5, TEAL, True)]],
+         align=PP_ALIGN.CENTER, margin=0)
+
+    cx = gx + gw + 0.04
+    cw2 = x0 + W - 0.08 - cx
+    shape(s, cx, iy, cw2, ih, WHITE, TEAL, MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.05)
+    text(s, cx + 0.06, iy + 0.02, cw2 - 0.12, 0.22,
+         [[("控制面｜8 元组件", 8.5, TEAL, True), ("  只管把 KV 管住：跨介质操作", 7.5, GRAY, False)]],
+         anchor=MSO_ANCHOR.MIDDLE, margin=0.02)
+    groups = [("搬迁与复制", ("copy", "move"), NAVY), ("保活与锁留", ("keepalive", "pin"), ORANGE),
+              ("冷热升降层", ("promote", "demote"), TEAL), ("存续与回收", ("retain", "remove"), GREEN)]
+    gwid = (cw2 - 0.12 - 3 * 0.06) / 4
+    for i, (g, prims, c) in enumerate(groups):
+        bx = cx + 0.06 + i * (gwid + 0.06)
+        text(s, bx, iy + 0.26, gwid, 0.2, [[(g, 7.5, c, True)]], align=PP_ALIGN.CENTER,
+             anchor=MSO_ANCHOR.MIDDLE, margin=0)
+        for j, p in enumerate(prims):
+            label(s, bx, iy + 0.48 + j * 0.4, gwid, 0.35, [[(p, 8.5, c, True)]],
+                  RGBColor(0xF8, 0xFA, 0xFC), c, radius=0.1, margin=0.01)
+    chip(s, cx + 0.06, iy + ih - 0.33, cw2 - 0.12, 0.25,
+         "核验与台账：确定性 READY 核验 · 对账 · 生命周期台账", TEAL, fill=TEAL_BG, size=8, bold=True)
+
+    # 中下层之间
+    ty = my + mh
+    q = W / 4
+    tag(s, x0 + q * 0.5 - 0.4, ty, W, "选路分发", NAVY)
+    tag(s, x0 + q * 1.5 - 0.4, ty, W, "KV 事件上行", TEAL, up=True)
+    tag(s, x0 + q * 2.5 - 0.4, ty, W, "8 原语指令", RED)
+    tag(s, x0 + q * 3.5 - 0.4, ty, W, "副本事实 / 淘汰", TEAL, up=True)
+
+    # 下层
+    by, bh = ty + 0.24, 1.24
+    layer(s, x0, by, W, bh, "下层｜异构推理引擎 × 分布式 KV 存储池 × 三平面高速网络（数据面零拷贝直达）",
+          NAVY, RGBColor(0xEE, 0xF2, 0xF7))
+    ry = by + 0.29
+    ew = 3.3
+    shape(s, x0 + 0.08, ry, ew, 0.5, WHITE, NAVY, MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
+    text(s, x0 + 0.12, ry + 0.01, ew - 0.08, 0.2, [[("推理引擎集群（vLLM / SGLang / 昇腾引擎）", 8, NAVY, True)]],
+         margin=0.01)
+    chip(s, x0 + 0.14, ry + 0.23, 1.5, 0.22, "Prefill / Decode / 混部", NAVY, fill=BG, size=7.5)
+    chip(s, x0 + 1.72, ry + 0.23, 1.6, 0.22, "HBM 本地工作集", GREEN, fill=GREEN_BG, size=7.5, bold=True)
+    ax = x0 + 0.08 + ew
+    arrow(s, ax + 0.05, ry + 0.3, ax + 0.55, ry + 0.3, GREEN, 1.5, both=True)
+    text(s, ax, ry + 0.02, 0.6, 0.2, [[("旁路直传", 7, GREEN, True)]], align=PP_ALIGN.CENTER, margin=0)
+    sx = ax + 0.6
+    sw = x0 + W - 0.08 - sx
+    shape(s, sx, ry, sw, 0.5, WHITE, GREEN, MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.08)
+    text(s, sx + 0.04, ry + 0.01, sw - 0.08, 0.2, [[("分布式 KV 存储池（全局副本权威）", 8, GREEN, True)]],
+         margin=0.01)
+    chip(s, sx + 0.06, ry + 0.23, (sw - 0.18) / 2, 0.22, "本机 DRAM", GREEN, fill=GREEN_BG, size=7.5)
+    chip(s, sx + 0.12 + (sw - 0.18) / 2, ry + 0.23, (sw - 0.18) / 2, 0.22, "远端 DRAM", GREEN,
+         fill=GREEN_BG, size=7.5)
+    ny = ry + 0.56
+    shape(s, x0 + 0.08, ny, W - 0.16, 0.32, grad=(NAVY, RGBColor(0x1E, 0x3A, 0x6B), 0),
+          kind=MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.15)
+    text(s, x0 + 0.14, ny, 1.0, 0.32, [[("三平面网络", 8, WHITE, True)]], anchor=MSO_ANCHOR.MIDDLE,
+         margin=0)
+    nets = [("H2D 专用 UB（本机首选）", RGBColor(0x93, 0xC5, 0xFD)),
+            ("存储面 RoCE（跨机 / 升降层）", RGBColor(0x86, 0xEF, 0xAC)),
+            ("计算面 HCCS（算子隔离）", RGBColor(0xFD, 0xBA, 0x74))]
+    nw = (W - 0.16 - 0.95 - 3 * 0.08) / 3
+    for i, (t, c) in enumerate(nets):
+        chip(s, x0 + 1.0 + i * (nw + 0.08), ny + 0.05, nw, 0.22, t, c, fill=NAVY, size=7.5, tc=WHITE)
+
+    # 生命周期带
+    ly = by + bh + 0.08
+    label(s, x0, ly, 1.05, 0.36, [[("KV 全生命周期", 8.5, WHITE, True)]], RED, radius=0.2, margin=0.01)
+    steps = [("预热", RED), ("命中保活", ORANGE), ("均衡迁徙", NAVY), ("冷热升降", TEAL), ("存续回收", GREEN)]
+    stw = (W - 1.12 + 0.08 * 4) / 5
     for i, (t, c) in enumerate(steps):
         kind = MSO_SHAPE.PENTAGON if i == 0 else MSO_SHAPE.CHEVRON
-        label(s, px + 0.15 + i * (sw - 0.12), fy, sw, 0.38, [[(t, 10, WHITE, True)]], c, kind=kind,
+        label(s, x0 + 1.12 + i * (stw - 0.08), ly, stw, 0.36, [[(t, 8.5, WHITE, True)]], c, kind=kind,
               radius=None, margin=0)
-    text(s, px + 0.15, fy + 0.45, pw - 0.3, 0.42,
-         [[("三层打通：", 9, NAVY, True),
-           ("应用意图层 × KVCM 控制调度层 × 引擎存储网络底座；HBM（引擎 LRU）+ DRAM 池（KVCM）两层，"
-            "复杂度投在保留策略和路由", 9, SLATE, False)]],
-         align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, spacing=1.05, space_after=0)
+
+    # 底注
+    fy = ly + 0.44
+    label(s, x0, fy, W, py + ph - 0.1 - fy,
+          [[("旁挂零 Patch：", 8.5, RGBColor(0xFA, 0xCC, 0x15), True),
+            ("不改 vLLM / SGLang 调度内核；KVCM 异常时推理引擎自动回退原生路径；"
+             "引擎 / 存储双向可替", 9, WHITE, False)],
+           [("KV 第一公民：", 8.5, RGBColor(0xFA, 0xCC, 0x15), True),
+            ("KV 从「算完即弃的副产物」升级为「可编排的算力资产」，统筹算力、显存与网络", 9, WHITE, False)]],
+          grad=(NAVY, RGBColor(0x1E, 0x3A, 0x6B), 0), radius=0.12, shade=True, spacing=1.05,
+          align=PP_ALIGN.LEFT, margin=0.1)
+
 
 
 def kpi(s, x, y, w, h, big, unit, caption, accent, light):
@@ -266,7 +351,7 @@ def build(out: Path):
     # 方案介绍（左侧大块）
     px, py, pw, ph = 0.35, 1.05, 7.55, 6.2
     card(s, px, py, pw, ph, "02", "方案介绍", TEAL, TEAL_BG)
-    ring_diagram(s, px, py, pw, ph)
+    arch_diagram(s, px, py, pw, ph)
 
     # 右侧三块
     rx, rw = 8.07, 4.91
