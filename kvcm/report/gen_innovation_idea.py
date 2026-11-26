@@ -187,6 +187,28 @@ def tag(s, x, y, w, t, color, up=False):
     text(s, x + 0.05, y, 1.4, 0.24, [[(t, 7.5, color, True)]], anchor=MSO_ANCHOR.MIDDLE, margin=0)
 
 
+def mini_ring(s, cx, cy):
+    rings = [(0.78, "DRAM 共享池", GREEN, (GREEN_BG, RGBColor(0xCF, 0xEB, 0xD8), 90), None),
+             (0.62, "HBM", TEAL, (TEAL_BG, RGBColor(0xC9, 0xE4, 0xE7), 90), None),
+             (0.48, "KVCM 控制面", RED, None, MSO_LINE.DASH)]
+    for r, _, c, grad, dash in rings:
+        if grad:
+            circle(s, cx, cy, 2 * r, grad=grad, line=c, lw=1.0, shade=r == 0.78)
+        else:
+            circle(s, cx, cy, 2 * r, fill=WHITE, line=c, lw=1.25, dash=dash)
+    r_kv = 0.35
+    circle(s, cx, cy, 2 * r_kv, grad=(RGBColor(0x1E, 0x3A, 0x6B), NAVY, 90), shade=True)
+    text(s, cx - r_kv, cy - 0.26, 2 * r_kv, 0.52,
+         [[("KV", 13, WHITE, True)], [("集群第一公民", 6.5, RGBColor(0xFA, 0xCC, 0x15), True)],
+          [("可寻址 · 可保活", 5, LINE, False)]],
+         anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, space_after=0, spacing=0.9, margin=0)
+    inner = [0.62, 0.48, r_kv]
+    for (r, t, c, _, _), ri in zip(rings, inner):
+        h = r - ri
+        text(s, cx - 0.5, cy - r, 1.0, h, [[(t, 6, c, True)]], anchor=MSO_ANCHOR.MIDDLE,
+             align=PP_ALIGN.CENTER, margin=0, space_after=0, spacing=0.9)
+
+
 def arch_diagram(s, px, py, pw, ph):
     x0, W = px + 0.15, pw - 0.3
     text(s, px + 1.75, py + 0.1, pw - 1.9, 0.36,
@@ -207,7 +229,7 @@ def arch_diagram(s, px, py, pw, ph):
     my, mh = uy + uh + 0.24, 2.02
     layer(s, x0, my, W, mh, "中层｜KVCM 联合控制中枢（管理面决策 × 控制面执行解耦）", RED, PINK)
     iy, ih = my + 0.3, mh - 0.38
-    lw_ = 3.0
+    lw_ = 2.55
     lx = x0 + 0.08
     shape(s, lx, iy, lw_, ih, WHITE, NAVY, MSO_SHAPE.ROUNDED_RECTANGLE, radius=0.05)
     text(s, lx + 0.06, iy + 0.02, lw_ - 0.12, 0.22,
@@ -220,20 +242,20 @@ def arch_diagram(s, px, py, pw, ph):
     rh = 0.33
     for t, d, c in rings:
         label(s, lx + 0.06, ry, 0.82, rh, [[(t, 8, WHITE, True)]], c, radius=0.15, margin=0.01)
-        text(s, lx + 0.92, ry - 0.01, lw_ - 0.97, rh + 0.02, [[(d, 7.5, INK, False)]],
+        text(s, lx + 0.92, ry - 0.01, lw_ - 0.97, rh + 0.02, [[(d, 7, INK, False)]],
              anchor=MSO_ANCHOR.MIDDLE, spacing=1.0, space_after=0, margin=0.01)
         ry += rh + 0.05
     chip(s, lx + 0.06, ry + 0.01, lw_ - 0.12, 0.25, "KVT 统一视图：块 → 实例 × 介质 × 状态", NAVY,
-         fill=RGBColor(0xEE, 0xF2, 0xF7), size=8, bold=True)
+         fill=RGBColor(0xEE, 0xF2, 0xF7), size=7.5, bold=True)
 
     gx = lx + lw_ + 0.04
-    gw = 0.5
-    arrow(s, gx + 0.02, iy + ih * 0.38, gx + gw - 0.02, iy + ih * 0.38, RED, 1.5)
-    text(s, gx - 0.02, iy + ih * 0.38 - 0.22, gw + 0.04, 0.2, [[("Intent", 7.5, RED, True)]],
-         align=PP_ALIGN.CENTER, margin=0)
-    arrow(s, gx + gw - 0.02, iy + ih * 0.62, gx + 0.02, iy + ih * 0.62, TEAL, 1.5)
-    text(s, gx - 0.02, iy + ih * 0.62 + 0.02, gw + 0.04, 0.2, [[("READY", 7.5, TEAL, True)]],
-         align=PP_ALIGN.CENTER, margin=0)
+    gw = 1.6
+    mini_ring(s, gx + gw / 2, iy + ih / 2)
+    arrow(s, gx + 1.18, iy + 0.1, gx + gw - 0.02, iy + 0.1, RED, 1.5)
+    text(s, gx + 1.0, iy - 0.14, 0.6, 0.18, [[("Intent", 7, RED, True)]], align=PP_ALIGN.RIGHT,
+         margin=0)
+    arrow(s, gx + 0.42, iy + ih - 0.1, gx + 0.02, iy + ih - 0.1, TEAL, 1.5)
+    text(s, gx, iy + ih - 0.07, 0.6, 0.15, [[("READY", 7, TEAL, True)]], margin=0)
 
     cx = gx + gw + 0.04
     cw2 = x0 + W - 0.08 - cx
@@ -249,10 +271,10 @@ def arch_diagram(s, px, py, pw, ph):
         text(s, bx, iy + 0.26, gwid, 0.2, [[(g, 7.5, c, True)]], align=PP_ALIGN.CENTER,
              anchor=MSO_ANCHOR.MIDDLE, margin=0)
         for j, p in enumerate(prims):
-            label(s, bx, iy + 0.48 + j * 0.4, gwid, 0.35, [[(p, 8.5, c, True)]],
+            label(s, bx, iy + 0.48 + j * 0.4, gwid, 0.35, [[(p, 8, c, True)]],
                   RGBColor(0xF8, 0xFA, 0xFC), c, radius=0.1, margin=0.01)
     chip(s, cx + 0.06, iy + ih - 0.33, cw2 - 0.12, 0.25,
-         "核验与台账：确定性 READY 核验 · 对账 · 生命周期台账", TEAL, fill=TEAL_BG, size=8, bold=True)
+         "核验与台账：READY · 对账 · 保活", TEAL, fill=TEAL_BG, size=7.5, bold=True)
 
     # 中下层之间
     ty = my + mh
